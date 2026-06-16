@@ -1,0 +1,23 @@
+{
+  "name": "agentforce-chat-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bring-your-own-channel demo: chat with a Salesforce Agentforce agent from a React web app via a small streaming proxy.",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c green,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm -w server run dev",
+    "dev:client": "npm -w client run dev",
+    "build": "npm -w client run build",
+    "start": "npm -w server run start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
