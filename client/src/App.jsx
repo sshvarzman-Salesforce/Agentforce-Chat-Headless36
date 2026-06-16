@@ -181,78 +181,82 @@ export default function App() {
         </header>
 
         <div className="messages" ref={scrollRef}>
-          {status === 'idle' && (
-            <div className="welcome">
-              <div className="welcome-art">💬</div>
-              <h1>Chat with Agentforce</h1>
-              <p>Start a session to talk with the agent in real time.</p>
-              <button className="btn primary lg" onClick={handleStart}>
-                Start chat
-              </button>
-              {error && <div className="error-box">{error}</div>}
-            </div>
-          )}
-
-          {status === 'starting' && <div className="center-muted">Starting a session…</div>}
-
-          {status !== 'idle' &&
-            messages.map((m) => (
-              <div key={m.id} className={`bubble-row ${m.role}`}>
-                {m.role === 'agent' && <div className="avatar">AF</div>}
-                <div className={`bubble ${m.role} ${m.streaming && !m.text ? 'thinking' : ''}`}>
-                  {m.role === 'agent' && m.streaming && !m.text ? (
-                    <>
-                      <TypingDots />
-                      <span className="thinking-text">
-                        {m.progress && m.progress !== '…' ? m.progress : 'Thinking…'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      {m.text}
-                      {m.streaming && m.text && <span className="caret" />}
-                    </>
-                  )}
-                </div>
+          <div className="thread">
+            {status === 'idle' && (
+              <div className="welcome">
+                <div className="welcome-art">💬</div>
+                <h1>Chat with Agentforce</h1>
+                <p>Start a session to talk with the agent in real time.</p>
+                <button className="btn primary lg" onClick={handleStart}>
+                  Start chat
+                </button>
+                {error && <div className="error-box">{error}</div>}
               </div>
-            ))}
+            )}
 
-          {status === 'ended' && !showFeedback && (
-            <div className="center-muted">
-              <p>This session has ended.</p>
-              <button className="btn primary" onClick={handleStart}>
-                Start a new chat
-              </button>
-            </div>
-          )}
+            {status === 'starting' && <div className="center-muted">Starting a session…</div>}
+
+            {status !== 'idle' &&
+              messages.map((m) => (
+                <div key={m.id} className={`bubble-row ${m.role}`}>
+                  {m.role === 'agent' && <div className="avatar">AF</div>}
+                  <div className={`bubble ${m.role} ${m.streaming && !m.text ? 'thinking' : ''}`}>
+                    {m.role === 'agent' && m.streaming && !m.text ? (
+                      <>
+                        <TypingDots />
+                        <span className="thinking-text">
+                          {m.progress && m.progress !== '…' ? m.progress : 'Thinking…'}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {m.text}
+                        {m.streaming && m.text && <span className="caret" />}
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+            {status === 'ended' && !showFeedback && (
+              <div className="center-muted">
+                <p>This session has ended.</p>
+                <button className="btn primary" onClick={handleStart}>
+                  Start a new chat
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {status === 'active' && (
           <div className="composer">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={canType ? 'Type your message…' : 'Agent is replying…'}
-              rows={1}
-              disabled={!canType}
-            />
-            <button className="btn primary send" onClick={handleSend} disabled={!canType || !input.trim()}>
-              ➤
-            </button>
+            <div className="composer-inner">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={canType ? 'Message the agent…' : 'Agent is replying…'}
+                rows={1}
+                disabled={!canType}
+              />
+              <button className="btn primary send" onClick={handleSend} disabled={!canType || !input.trim()}>
+                ➤
+              </button>
+            </div>
           </div>
         )}
 
         {error && status === 'active' && <div className="error-strip">{error}</div>}
-      </div>
 
-      <div className="footer-note">
-        Proxy: <code>{getApiBase() || '(dev / same-origin)'}</code>
+        <div className="footer-note">
+          Proxy: <code>{getApiBase() || '(dev / same-origin)'}</code>
+        </div>
       </div>
 
       {showFeedback && (
