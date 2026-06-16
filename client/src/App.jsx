@@ -57,38 +57,42 @@ export default function App() {
 
     const agentId = pushMessage('agent', '', true);
 
-    // A turn can contain several messages. Each message streams as TextChunk
-    // deltas, then an Inform carrying that message's full text. We collect
-    // finished messages in `segments` and the in-flight one in `current`,
-    // so the Inform never duplicates what the chunks already showed.
+    // A turn can contain several messages. `segments` holds finished messages,
+    // `current` the in-flight one. Chunks vary by agent config — some stream
+    // deltas, some resend the full text, some repeat it verbatim — so the chunk
+    // handler dedupes (exact repeat), detects cumulative resends, and otherwise
+    // appends the delta. Inform finalizes the current segment.
     const segments = [];
     let current = '';
 
     const render = () =>
       patchMessage(agentId, () => ({
         text: [...segments, ...(current ? [current] : [])].join('\n\n'),
+        progress: null,
       }));
+
+    const addChunk = (t) => {
+      if (!t) return;
+      if (current === t || current.endsWith(t)) return; // exact / trailing repeat
+      if (current && t.startsWith(current)) current = t; // cumulative resend
+      else if (current.startsWith(t)) return; // partial we already have
+      else current += t; // genuine delta
+      render();
+    };
+
+    const finishSegment = (t) => {
+      const finalText = (t && t.length >= current.length ? t : current).trim();
+      if (finalText) segments.push(finalText);
+      current = '';
+      render();
+    };
 
     await streamMessage(sessionId, text, {
       onProgress: (t) => patchMessage(agentId, () => ({ progress: t })),
-      onChunk: (t) => {
-        current += t;
-        patchMessage(agentId, (m) => ({
-          text: [...segments, current].join('\n\n'),
-          progress: null,
-        }));
-      },
-      onInform: (t) => {
-        // Authoritative full text for the current message segment.
-        segments.push(t || current);
-        current = '';
-        patchMessage(agentId, () => ({ text: segments.join('\n\n'), progress: null }));
-      },
+      onChunk: addChunk,
+      onInform: finishSegment,
       onEnd: () => {
-        if (current) {
-          segments.push(current);
-          current = '';
-        }
+        if (current) finishSegment();
         patchMessage(agentId, (m) => ({
           streaming: false,
           progress: null,
