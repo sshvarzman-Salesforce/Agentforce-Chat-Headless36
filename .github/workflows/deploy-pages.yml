@@ -1,13 +1,15 @@
 name: Deploy frontend to GitHub Pages
 
 # Builds the React client and publishes it to GitHub Pages.
-# The proxy server is NOT deployed here (Pages is static only) — host it
-# separately (Render/Railway/Cloudflare) and point the app at it via the ⚙
-# Settings dialog, or set the VITE_PROXY_URL repo variable below.
+#
+# DISABLED on push by default: GitHub Pages is not available for PRIVATE repos
+# on free plans, so an automatic run fails at the "configure-pages" step. This
+# workflow is therefore manual-only (Run workflow button). Enable Pages first
+# (repo public OR paid plan) → Settings ▸ Pages ▸ Source: GitHub Actions, then
+# trigger it manually. The proxy is NOT deployed here (Pages is static only) —
+# host it separately and point the app at it via the ⚙ Settings dialog.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
