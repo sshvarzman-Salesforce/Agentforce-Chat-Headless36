@@ -1,14 +1,12 @@
-# Agentforce Chat — Deploy Your Agent on Any Website
+# Headless360 — Agentforce Chat on Any Website
 
 A ready-to-use **React web app** that lets your customers chat with a **Salesforce
 Agentforce** agent, in real time, on your own site. It's a "bring your own channel"
 template: plug in your org's details and your agent is live on a third-party website.
 
-It uses the official [Agentforce Agent API](https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-examples.html)
+It uses the official [Agentforce Agent API](https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api.html)
 and demonstrates the full lifecycle: **OAuth → create session → streaming messages →
 end session → submit feedback**.
-
-![flow](https://img.shields.io/badge/browser-%E2%86%92%20proxy%20%E2%86%92%20Agent%20API-0d6efd)
 
 ---
 
@@ -29,64 +27,79 @@ browser. This is the secure, production-correct pattern.
 
 ## What you need (one-time Salesforce setup)
 
-Anyone with Salesforce + Agentforce can run this. You need **four values** from your
-org, which come from two pieces of setup:
+Anyone with Salesforce + Agentforce can run this. You need **four values** from your org:
 
-### 1. An API-enabled Agentforce agent
-- Build/activate an agent in **Agent Builder**.
-- Make sure it's **connected to the Agent API** (API channel enabled) and **published**.
-- → gives you the **Agent ID** (`0Xx…`).
+1. **An API-enabled Agentforce agent** — built/activated in Agent Builder and connected
+   to the Agent API. → gives you the **Agent ID** (`0Xx…`).
+2. **An External Client App** using the **OAuth 2.0 Client Credentials flow**, with a
+   run-as user and the Agent API scopes (`sfap_api`, `chatbot_api`).
+   → gives you the **Consumer Key** and **Consumer Secret**.
+   Follow the official guide: [Get Started with the Agent API](https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api-get-started.html).
+3. **Your My Domain** — e.g. `acme.my.salesforce.com`.
 
-### 2. A Connected App using the Client Credentials flow
-- **Setup → App Manager → New Connected App** (or External Client App).
-- Enable **OAuth Settings** → enable the **Client Credentials Flow**.
-- OAuth scopes: include the Agent API scopes (e.g. **`sfap_api`** and **`chatbot_api`**).
-- Set a **Run-As user** for the Client Credentials flow (a user with access to the agent).
-- → gives you the **Consumer Key** and **Consumer Secret**.
+Plus **Node.js 18+** on the machine that runs the proxy.
 
-### 3. Your My Domain
-- **Setup → My Domain** → e.g. `acme.my.salesforce.com`.
+### Where to find each value
 
-### Get your values — summary
+| Value              | Where to find it                                                                 |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `SF_MY_DOMAIN_URL` | Setup → **My Domain** → the domain ending in `.my.salesforce.com` (no `https://`)|
+| `SF_AGENT_ID`      | Run the SOQL below → use the returned `Id` (starts with `0Xx`)                   |
+| `SF_CLIENT_ID`     | Setup → **External Client App Manager** → your app → Settings → OAuth Settings → Consumer Key |
+| `SF_CLIENT_SECRET` | Same screen → Consumer Secret                                                    |
 
-| Value                 | Where to find it                                                        |
-| --------------------- | ----------------------------------------------------------------------- |
-| `SF_MY_DOMAIN_URL`    | Setup → My Domain (host only, no `https://`)                            |
-| `SF_AGENT_ID`         | Agent Builder URL / Agents setup page (18-char ID starting `0Xx`)       |
-| `SF_CLIENT_ID`        | App Manager → your Connected App → Manage Consumer Details (Consumer Key)|
-| `SF_CLIENT_SECRET`    | Same screen (Consumer Secret)                                           |
-
-> Plus **Node.js 18+** installed on the machine that runs the proxy.
+Get your Agent ID with SOQL (replace the developer name with your agent's):
+```sql
+SELECT Id, DeveloperName FROM BotDefinition WHERE DeveloperName = 'YOUR_AGENT_DEVELOPER_NAME'
+```
 
 ---
 
-## Run it locally (≈ 3 minutes)
+## Run it locally
 
+> **Windows / PowerShell:** use `npm.cmd` instead of `npm` (PowerShell blocks the
+> `npm` script by default). On **Mac/Linux** use `npm` and `cp` instead of `copy`.
+
+**1. Get the code** (one time)
 ```bash
-# 1. Get the code
-git clone https://github.com/sshvarzman-Salesforce/agentforce-chat-demo.git
-cd agentforce-chat-demo
-
-# 2. Install dependencies (one time)
-npm install
-
-# 3. Create your config file
-cp .env.example .env        # Windows: copy .env.example .env
-
-# 4. Edit .env and fill in YOUR four values:
-#    SF_MY_DOMAIN_URL, SF_AGENT_ID, SF_CLIENT_ID, SF_CLIENT_SECRET
-
-# 5. Start it
-npm start
+git clone https://github.com/sshvarzman-Salesforce/Agentforce-Chat-Headless36.git
 ```
 
-Then open **http://localhost:8787** and click **Start chat**.
+**2. Go into the folder** (run everything from here)
+```bash
+cd Agentforce-Chat-Headless36
+```
 
-> **Windows / PowerShell:** if `npm` is blocked by the script-execution policy, use
-> `npm.cmd install` and `npm.cmd start` instead (or run once:
-> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`).
+**3. Install the project's dependencies** (run once per fresh clone — downloads the packages the app needs)
+```bash
+npm.cmd install
+```
 
-`npm start` runs a single service that serves both the UI and the proxy from one URL.
+**4. Create your config file** (one time)
+```bash
+copy .env.example .env
+```
+
+**5. Open the `.env` file you just created and fill in YOUR four values:**
+```ini
+SF_MY_DOMAIN_URL=your-domain.my.salesforce.com
+SF_AGENT_ID=0Xx...
+SF_CLIENT_ID=your-consumer-key
+SF_CLIENT_SECRET=your-consumer-secret
+```
+See **"Where to find each value"** above. Save the file after replacing all four placeholders.
+
+**6. Start it** (from inside the folder)
+```bash
+npm.cmd start
+```
+Wait for: `Agentforce proxy listening on http://localhost:8787`
+_(The UI builds automatically the first time — give it a few seconds.)_
+
+**7. Open** http://localhost:8787 → click **Start chat**. 🎉
+
+**Stop:** `Ctrl+C`. Run steps 3–6 from *inside* the `Agentforce-Chat-Headless36` folder.
+
 For development with hot-reload, use `npm run dev` (UI on `:5173`, proxy on `:8787`).
 
 ---
@@ -133,8 +146,7 @@ as one Node service**. Example with [Render](https://render.com):
 
 > **GitHub Pages note:** Pages can host the static UI but **cannot run the proxy**,
 > and it's unavailable for private repos on free plans. A single Node host (above) is
-> the simplest path to a working public demo. The manual `.github/workflows/deploy-pages.yml`
-> is included for the UI-only case if you make the repo public and host the proxy separately.
+> the simplest path to a working public demo.
 
 ---
 
@@ -147,8 +159,8 @@ All settings live in `.env` (see [`.env.example`](.env.example)):
 | `SF_MY_DOMAIN_URL` |   yes    | Your My Domain host (no `https://`)                    |
 | `SF_API_HOST`      |   no     | `api.salesforce.com` (default) or `api.gov.salesforce.com` |
 | `SF_AGENT_ID`      |   yes    | The Agentforce agent ID (`0Xx…`)                       |
-| `SF_CLIENT_ID`     |   yes    | Connected App consumer key                             |
-| `SF_CLIENT_SECRET` |   yes    | Connected App consumer secret                          |
+| `SF_CLIENT_ID`     |   yes    | External Client App consumer key                       |
+| `SF_CLIENT_SECRET` |   yes    | External Client App consumer secret                    |
 | `PORT`             |   no     | Proxy port (default `8787`)                            |
 | `ALLOWED_ORIGIN`   |   no     | CORS origin for a separately-hosted frontend (`*` for dev) |
 | `FEEDBACK_MODE`    |   no     | `enum` (default) or `label`                            |
@@ -165,13 +177,18 @@ To switch environments/agents, just change the four `SF_*` values and restart.
 | `server/`   | Express streaming proxy (holds the secret, calls the API)|
 | `.env`      | Your org's values (gitignored — copy from `.env.example`)|
 
+Full Agent API documentation:
+[Salesforce Developer Guide for Agentforce Agent APIs](https://developer.salesforce.com/docs/ai/agentforce/guide/agent-api.html)
+
 ---
 
 ## Troubleshooting
 
 | Symptom | Fix |
 | ------- | --- |
-| `invalid_client` on Start chat | `SF_CLIENT_ID`/`SF_CLIENT_SECRET` wrong, or Client Credentials flow not enabled on the Connected App. Restart after editing `.env`. |
-| Session creation fails (4xx) | Agent not API-enabled/published, or the Run-As user lacks access, or `SF_AGENT_ID` is wrong. |
-| "Cannot reach the proxy server" | The proxy isn't running, or the frontend's proxy URL (⚙) is wrong. |
+| `Cannot find package '…'` (e.g. express) | You skipped step 3 — run `npm.cmd install` in the project folder. |
+| `invalid_client` on Start chat | `SF_CLIENT_ID`/`SF_CLIENT_SECRET` wrong, or Client Credentials flow not enabled on the External Client App. Fix `.env`, then restart. |
+| Session creation fails (4xx) | Agent not API-enabled/published, the run-as user lacks access, or `SF_AGENT_ID` is wrong. |
+| Page is blank / UI won't load | Run `npm.cmd run build`, then `npm.cmd start`. |
+| "Cannot reach the proxy server" | The proxy isn't running — `cd` into the folder and `npm.cmd start` again. |
 | Changes to `.env` not taking effect | The proxy reads env at boot — stop (`Ctrl+C`) and start again. |
