@@ -8,8 +8,7 @@ const newId = () => `m${++idSeq}`;
 export default function App() {
   const [status, setStatus] = useState('idle'); // idle | starting | active | ended
   const [sessionId, setSessionId] = useState(null);
-  const [messages, setMessages] = useState([]); // { id, role, text, streaming }
-  const [thinking, setThinking] = useState(null); // progress text while streaming
+  const [messages, setMessages] = useState([]); // { id, role, text, streaming, progress }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false); // a turn is in flight
   const [error, setError] = useState(null);
@@ -21,11 +20,11 @@ export default function App() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, thinking]);
+  }, [messages]);
 
   function pushMessage(role, text, streaming = false) {
     const id = newId();
-    setMessages((m) => [...m, { id, role, text, streaming }]);
+    setMessages((m) => [...m, { id, role, text, streaming, progress: null }]);
     return id;
   }
   function patchMessage(id, updater) {
@@ -55,31 +54,50 @@ export default function App() {
     setError(null);
     pushMessage('user', text);
     setBusy(true);
-    setThinking('…');
 
     const agentId = pushMessage('agent', '', true);
-    let gotText = false;
+
+    // A turn can contain several messages. Each message streams as TextChunk
+    // deltas, then an Inform carrying that message's full text. We collect
+    // finished messages in `segments` and the in-flight one in `current`,
+    // so the Inform never duplicates what the chunks already showed.
+    const segments = [];
+    let current = '';
+
+    const render = () =>
+      patchMessage(agentId, () => ({
+        text: [...segments, ...(current ? [current] : [])].join('\n\n'),
+      }));
 
     await streamMessage(sessionId, text, {
-      onProgress: (t) => setThinking(t),
+      onProgress: (t) => patchMessage(agentId, () => ({ progress: t })),
       onChunk: (t) => {
-        gotText = true;
-        setThinking(null);
-        patchMessage(agentId, (m) => ({ text: m.text + t }));
+        current += t;
+        patchMessage(agentId, (m) => ({
+          text: [...segments, current].join('\n\n'),
+          progress: null,
+        }));
       },
       onInform: (t) => {
-        gotText = true;
-        setThinking(null);
-        patchMessage(agentId, () => ({ text: t }));
+        // Authoritative full text for the current message segment.
+        segments.push(t || current);
+        current = '';
+        patchMessage(agentId, () => ({ text: segments.join('\n\n'), progress: null }));
       },
       onEnd: () => {
-        setThinking(null);
-        patchMessage(agentId, (m) => ({ streaming: false, text: m.text || (gotText ? m.text : '…') }));
+        if (current) {
+          segments.push(current);
+          current = '';
+        }
+        patchMessage(agentId, (m) => ({
+          streaming: false,
+          progress: null,
+          text: segments.join('\n\n') || m.text,
+        }));
         setBusy(false);
       },
       onError: (err) => {
-        setThinking(null);
-        patchMessage(agentId, () => ({ streaming: false, text: '⚠️ ' + friendlyError(err) }));
+        patchMessage(agentId, () => ({ streaming: false, progress: null, text: '⚠️ ' + friendlyError(err) }));
         setBusy(false);
       },
     });
@@ -94,7 +112,6 @@ export default function App() {
     }
     setStatus('ended');
     setBusy(false);
-    setThinking(null);
     setShowFeedback(true);
   }
 
@@ -182,22 +199,23 @@ export default function App() {
             messages.map((m) => (
               <div key={m.id} className={`bubble-row ${m.role}`}>
                 {m.role === 'agent' && <div className="avatar">AF</div>}
-                <div className={`bubble ${m.role}`}>
-                  {m.text || (m.streaming ? <TypingDots /> : '')}
-                  {m.streaming && m.text && <span className="caret" />}
+                <div className={`bubble ${m.role} ${m.streaming && !m.text ? 'thinking' : ''}`}>
+                  {m.role === 'agent' && m.streaming && !m.text ? (
+                    <>
+                      <TypingDots />
+                      <span className="thinking-text">
+                        {m.progress && m.progress !== '…' ? m.progress : 'Thinking…'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {m.text}
+                      {m.streaming && m.text && <span className="caret" />}
+                    </>
+                  )}
                 </div>
               </div>
             ))}
-
-          {thinking && status === 'active' && (
-            <div className="bubble-row agent">
-              <div className="avatar">AF</div>
-              <div className="bubble agent thinking">
-                <TypingDots />
-                <span className="thinking-text">{thinking !== '…' ? thinking : 'Thinking…'}</span>
-              </div>
-            </div>
-          )}
 
           {status === 'ended' && !showFeedback && (
             <div className="center-muted">
