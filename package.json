@@ -12,6 +12,7 @@
     "dev:server": "npm -w server run dev",
     "dev:client": "npm -w client run dev",
     "build": "npm -w client run build",
+    "prestart": "npm run build",
     "start": "npm -w server run start"
   },
   "devDependencies": {
