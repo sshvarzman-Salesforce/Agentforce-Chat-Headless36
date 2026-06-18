@@ -100,7 +100,21 @@ export async function streamMessage(sessionId, text, handlers = {}) {
       data = dataStr;
     }
 
-    const type = eventName || data?.type || data?.message?.type || '';
+    // The event name shows up inconsistently — sometimes on the SSE `event:`
+    // line, sometimes only inside the JSON — and the casing varies too
+    // (ProgressIndicator vs PROGRESS_INDICATOR). Normalize every candidate and
+    // match the first known type, so a progress indicator is never mistaken for
+    // body text and concatenated onto the agent's actual reply.
+    const norm = (s) => String(s || '').replace(/[^a-z]/gi, '').toLowerCase();
+    const KNOWN = {
+      progressindicator: 'ProgressIndicator',
+      textchunk: 'TextChunk',
+      inform: 'Inform',
+      validationfailurechunk: 'Inform',
+      endofturn: 'EndOfTurn',
+    };
+    const candidates = [eventName, data?.type, data?.message?.type].map(norm);
+    const type = candidates.map((c) => KNOWN[c]).find(Boolean) || candidates.find(Boolean) || '';
     const txt = pickText(data);
 
     switch (type) {
@@ -111,7 +125,6 @@ export async function streamMessage(sessionId, text, handlers = {}) {
         if (txt) onChunk?.(txt);
         break;
       case 'Inform':
-      case 'ValidationFailureChunk':
         if (txt) onInform?.(txt);
         break;
       case 'EndOfTurn':
