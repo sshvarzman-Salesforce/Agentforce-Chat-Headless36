@@ -96,7 +96,6 @@ app.post('/api/session', async (_req, res) => {
         instanceConfig: { endpoint: `https://${SF_MY_DOMAIN_URL}` },
         streamingCapabilities: { chunkTypes: ['Text'] },
         bypassUser: true,
-        variables: [{ name: '$Context.EndUserLanguage', type: 'Text', value: 'en_US' }],
       }),
     });
     const json = await resp.json().catch(() => ({}));
