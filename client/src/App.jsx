@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createSession, endSession, streamMessage, submitFeedback, getApiBase, setProxyUrl } from './api.js';
 import FeedbackModal from './components/FeedbackModal.jsx';
+import BankShell from './components/BankShell.jsx';
+import ChatPanel from './components/ChatPanel.jsx';
 
 let idSeq = 0;
 const newId = () => `m${++idSeq}`;
@@ -8,9 +10,9 @@ const newId = () => `m${++idSeq}`;
 export default function App() {
   const [status, setStatus] = useState('idle'); // idle | starting | active | ended
   const [sessionId, setSessionId] = useState(null);
-  const [messages, setMessages] = useState([]); // { id, role, text, streaming, progress }
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false); // a turn is in flight
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -34,13 +36,13 @@ export default function App() {
   async function handleStart() {
     setError(null);
     setStatus('starting');
+    setMessages([]);
     try {
       const { sessionId: sid, messages: greeting } = await createSession();
       setSessionId(sid);
       setStatus('active');
-      setMessages([]);
       if (greeting && greeting.length) greeting.forEach((g) => pushMessage('agent', g));
-      else pushMessage('agent', 'Hi! How can I help you today?');
+      else pushMessage('agent', 'Hi Alex! I\'m Ada, your Meridian assistant. How can I help you today?');
     } catch (err) {
       setStatus('idle');
       setError(friendlyError(err));
@@ -57,11 +59,6 @@ export default function App() {
 
     const agentId = pushMessage('agent', '', true);
 
-    // A turn can contain several messages. `segments` holds finished messages,
-    // `current` the in-flight one. Chunks vary by agent config — some stream
-    // deltas, some resend the full text, some repeat it verbatim — so the chunk
-    // handler dedupes (exact repeat), detects cumulative resends, and otherwise
-    // appends the delta. Inform finalizes the current segment.
     const segments = [];
     let current = '';
 
@@ -73,10 +70,10 @@ export default function App() {
 
     const addChunk = (t) => {
       if (!t) return;
-      if (current === t || current.endsWith(t)) return; // exact / trailing repeat
-      if (current && t.startsWith(current)) current = t; // cumulative resend
-      else if (current.startsWith(t)) return; // partial we already have
-      else current += t; // genuine delta
+      if (current === t || current.endsWith(t)) return;
+      if (current && t.startsWith(current)) current = t;
+      else if (current.startsWith(t)) return;
+      else current += t;
       render();
     };
 
@@ -119,6 +116,15 @@ export default function App() {
     setShowFeedback(true);
   }
 
+  function resetChat() {
+    setSessionId(null);
+    setMessages([]);
+    setError(null);
+    setInput('');
+    setBusy(false);
+    setStatus('idle');
+  }
+
   async function handleFeedback(stars, comment) {
     setFeedbackSubmitting(true);
     try {
@@ -129,13 +135,13 @@ export default function App() {
     } finally {
       setFeedbackSubmitting(false);
       setShowFeedback(false);
-      setSessionId(null);
+      resetChat();
     }
   }
 
   function handleSkipFeedback() {
     setShowFeedback(false);
-    setSessionId(null);
+    resetChat();
   }
 
   function handleSettings() {
@@ -150,118 +156,23 @@ export default function App() {
     }
   }
 
-  const canType = status === 'active' && !busy;
-
   return (
-    <div className="app">
-      <div className="chat-card">
-        <header className="chat-header">
-          <div className="brand">
-            <div className="brand-mark">AF</div>
-            <div>
-              <div className="brand-title">Agentforce Assistant</div>
-              <div className="brand-status">
-                <span className={`dot ${status === 'active' ? 'live' : ''}`} />
-                {status === 'active'
-                  ? 'Connected'
-                  : status === 'starting'
-                    ? 'Connecting…'
-                    : status === 'ended'
-                      ? 'Session ended'
-                      : 'Offline'}
-              </div>
-            </div>
-          </div>
-          <div className="header-actions">
-            {status === 'active' && (
-              <button className="btn danger sm" onClick={handleEnd}>
-                End chat
-              </button>
-            )}
-            <button className="icon-btn" title="Proxy settings" onClick={handleSettings}>
-              ⚙
-            </button>
-          </div>
-        </header>
-
-        <div className="messages" ref={scrollRef}>
-          <div className="thread">
-            {status === 'idle' && (
-              <div className="welcome">
-                <div className="welcome-art">💬</div>
-                <h1>Chat with Agentforce</h1>
-                <p>Start a session to talk with the agent in real time.</p>
-                <button className="btn primary lg" onClick={handleStart}>
-                  Start chat
-                </button>
-                {error && <div className="error-box">{error}</div>}
-              </div>
-            )}
-
-            {status === 'starting' && <div className="center-muted">Starting a session…</div>}
-
-            {status !== 'idle' &&
-              messages.map((m) => (
-                <div key={m.id} className={`bubble-row ${m.role}`}>
-                  {m.role === 'agent' && <div className="avatar">AF</div>}
-                  <div className={`bubble ${m.role} ${m.streaming && !m.text ? 'thinking' : ''}`}>
-                    {m.role === 'agent' && m.streaming && !m.text ? (
-                      <>
-                        <TypingDots />
-                        <span className="thinking-text">
-                          {m.progress && m.progress !== '…' ? m.progress : 'Thinking…'}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        {m.text}
-                        {m.streaming && m.text && <span className="caret" />}
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-            {status === 'ended' && !showFeedback && (
-              <div className="center-muted">
-                <p>This session has ended.</p>
-                <button className="btn primary" onClick={handleStart}>
-                  Start a new chat
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {status === 'active' && (
-          <div className="composer">
-            <div className="composer-inner">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={canType ? 'Message the agent…' : 'Agent is replying…'}
-                rows={1}
-                disabled={!canType}
-              />
-              <button className="btn primary send" onClick={handleSend} disabled={!canType || !input.trim()}>
-                ➤
-              </button>
-            </div>
-          </div>
-        )}
-
-        {error && status === 'active' && <div className="error-strip">{error}</div>}
-
-        <div className="footer-note">
-          Proxy: <code>{getApiBase() || '(dev / same-origin)'}</code>
-        </div>
-      </div>
+    <>
+      <BankShell onSettings={handleSettings}>
+        <ChatPanel
+          status={status}
+          messages={messages}
+          input={input}
+          busy={busy}
+          error={error}
+          scrollRef={scrollRef}
+          onInputChange={setInput}
+          onStart={handleStart}
+          onSend={handleSend}
+          onEnd={handleEnd}
+          onStartNew={handleStart}
+        />
+      </BankShell>
 
       {showFeedback && (
         <FeedbackModal
@@ -276,17 +187,7 @@ export default function App() {
           {toast}
         </div>
       )}
-    </div>
-  );
-}
-
-function TypingDots() {
-  return (
-    <span className="typing">
-      <span />
-      <span />
-      <span />
-    </span>
+    </>
   );
 }
 
